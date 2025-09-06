@@ -1,12 +1,12 @@
+# فایل: app_dashboard_pro.py
+
 import streamlit as st
-import pandas as pd
 import os
 import subprocess
-from datetime import datetime
-from PIL import Image
+import datetime
 from streamlit_folium import st_folium
 import folium
-from pdf_report import generate_pdf_report
+from PIL import Image
 
 st.set_page_config(page_title="VoidBot PRO", layout="wide")
 st.title("🛰️ VoidBot PRO – نسخه نهایی با نقشه ضد خطا")
@@ -18,6 +18,7 @@ for folder in ["outputs/kmz/advanced", "outputs/png", "outputs/geotiff", "output
 # بارگذاری فایل لاگ
 log_path = "data/field_logs.csv"
 if os.path.exists(log_path):
+    import pandas as pd
     df = pd.read_csv(log_path)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["radius"] = pd.to_numeric(df["radius"], errors="coerce")
@@ -32,8 +33,9 @@ st.header("🆕 تحلیل جدید")
 coord_input = st.text_input("📍 مختصات", key="coord")
 radius = st.number_input("📏 شعاع تحلیل (متر)", min_value=10, max_value=1000, value=100)
 
+# تبدیل مختصات
+import re
 def parse_coordinates(text):
-    import re
     try:
         if "°" in text or "'" in text:
             parts = re.findall(r"(\d+)[°'](\d+)?", text)
@@ -47,6 +49,7 @@ def parse_coordinates(text):
     except:
         return None, None
 
+# پیدا کردن آخرین فایل در پوشه
 def get_latest_file(folder, ext):
     files = [f for f in os.listdir(folder) if ext in f]
     files.sort(key=lambda x: os.path.getmtime(os.path.join(folder, x)), reverse=True)
@@ -64,15 +67,15 @@ if st.button("🚀 اجرای تحلیل"):
         png_path, png_name = get_latest_file("outputs/png", ".png")
         tif_path, tif_name = get_latest_file("outputs/geotiff", ".tif")
         lst_path, lst_name = get_latest_file("outputs/png", "lst")
+
+        # گزارش PDF
+        from pdf_report import generate_pdf_report
         pdf_path = generate_pdf_report(lat, lon, kmz_name, png_name, tif_name, lst_name)
 
         with open(kmz_path, "rb") as f:
             st.download_button("🌍 دانلود KMZ", data=f, file_name=kmz_name)
-        if os.path.exists(png_path):
-            with open(png_path, "rb") as f:
-                st.download_button("🧲 دانلود فلزات", data=f, file_name=png_name)
-        else:
-            st.info("📂 فایل فلزات (PNG) هنوز تولید نشده یا پیدا نشد.")
+        with open(png_path, "rb") as f:
+            st.download_button("🧲 دانلود فلزات", data=f, file_name=png_name)
         with open(tif_path, "rb") as f:
             st.download_button("🗺️ دانلود GeoTIFF", data=f, file_name=tif_name)
         with open(pdf_path, "rb") as f:
@@ -137,29 +140,17 @@ if not df.empty:
                     st.warning("تصویر قابل نمایش نیست.")
 
     st.markdown("### 🗺️ نقشه نقاط تحلیل‌شده")
-    if (
-            not filtered.empty and
-            "latitude" in filtered.columns and
-            "longitude" in filtered.columns and
-            filtered["latitude"].notna().all() and
-            filtered["longitude"].notna().all()
-    ):
-        lat_mean = filtered["latitude"].mean()
-        lon_mean = filtered["longitude"].mean()
-
-        if pd.notna(lat_mean) and pd.notna(lon_mean):
-            map_center = [lat_mean, lon_mean]
-            m = folium.Map(location=map_center, zoom_start=6)
-
-            for _, row in filtered.iterrows():
-                folium.Marker(
-                    location=[row["latitude"], row["longitude"]],
-                    popup=f"{row['timestamp']} - شعاع {row['radius']}متر",
-                    tooltip="📍"
-                ).add_to(m)
-
-            st_folium(m, width=1200, height=500)
-        else:
-            st.info("📭 موقعیت مکانی قابل محاسبه نیست.")
+    if not filtered[["latitude", "longitude"]].isna().any().any():
+        map_center = [filtered["latitude"].mean(), filtered["longitude"].mean()]
+        m = folium.Map(location=map_center, zoom_start=6)
+        for _, row in filtered.iterrows():
+            folium.Marker(
+                location=[row["latitude"], row["longitude"]],
+                popup=f"{row['timestamp']} - شعاع {row['radius']}متر",
+                tooltip="📍"
+            ).add_to(m)
+        st_folium(m, width=1200, height=500)
     else:
-        st.info("📭 هیچ داده‌ای برای نمایش روی نقشه وجود ندارد.")
+        st.info("📭 داده‌ای برای نمایش روی نقشه وجود ندارد.")
+else:
+    st.info("📭 هنوز تحلیلی انجام نشده.")

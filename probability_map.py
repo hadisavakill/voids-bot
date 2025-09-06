@@ -1,48 +1,57 @@
-import rasterio
-import numpy as np
 import os
+import glob
+import numpy as np
+import rasterio
+from PIL import Image
 
-# 🔹 مسیر فایل‌های GeoTIFF — نام‌ها را بر اساس خروجی واقعی تنظیم کن
-ndvi_path = "outputs/geotiff/ndvi_20250902_153025.tif"
-ndwi_path = "outputs/geotiff/ndwi_20250902_153030.tif"
-void_path = "outputs/geotiff/void_20250902_153034.tif"
+# پیدا کردن جدیدترین فایل بر اساس تاریخ ساخت
+def get_latest_file(folder, prefix):
+    files = sorted(glob.glob(os.path.join(folder, f"{prefix}_*.tif")), key=os.path.getmtime, reverse=True)
+    return files[0] if files else None
 
-# 🔸 فقط جهت بررسی: چاپ مسیرها
-print("\n🗂️ Using files:")
-print("   NDVI:", ndvi_path)
-print("   NDWI:", ndwi_path)
-print("   VOID:", void_path)
+folder = "outputs/geotiff"
+ndvi_path = get_latest_file(folder, "ndvi")
+ndwi_path = get_latest_file(folder, "ndwi")
+void_path = get_latest_file(folder, "void")
 
-# 🟩 بارگذاری NDVI
+print("🛰️ Using files:")
+print("NDVI:", ndvi_path)
+print("NDWI:", ndwi_path)
+print("VOID:", void_path)
+
+# بررسی فایل‌ها
+if not all([ndvi_path, ndwi_path, void_path]):
+    raise FileNotFoundError("❌ یکی از فایل‌های NDVI, NDWI یا VOID پیدا نشد.")
+
+# بارگذاری داده‌ها
 with rasterio.open(ndvi_path) as ds:
-    ndvi = ds.read(1).astype("float32")
-    profile = ds.profile
-
-# 🟦 بارگذاری NDWI
+    ndvi = ds.read(1)
 with rasterio.open(ndwi_path) as ds:
-    ndwi = ds.read(1).astype("float32")
-
-# 🟫 بارگذاری VOID
+    ndwi = ds.read(1)
 with rasterio.open(void_path) as ds:
-    void = ds.read(1).astype("float32")
+    void = ds.read(1)
 
-# ⚠️ بررسی ابعاد فایل‌ها (اختیاری)
-if not (ndvi.shape == ndwi.shape == void.shape):
-    raise ValueError(f"Shapes not aligned: NDVI {ndvi.shape}, NDWI {ndwi.shape}, VOID {void.shape}")
+# نرمال‌سازی به بازه 0-255 برای ذخیره PNG
+def normalize(img):
+    img = np.nan_to_num(img, nan=0.0)
+    min_val = np.min(img)
+    max_val = np.max(img)
+    if max_val - min_val == 0:
+        return np.zeros_like(img, dtype=np.uint8)
+    return ((img - min_val) / (max_val - min_val) * 255).astype(np.uint8)
 
-# 🧠 محاسبه نقشه احتمال (وزن‌دهی)
-prob = 0.40 * (ndvi < 0.20).astype("float32") + \
-       0.30 * (ndwi < 0.00).astype("float32") + \
-       0.30 * void
+ndvi_norm = normalize(ndvi)
+ndwi_norm = normalize(ndwi)
+void_norm = normalize(void)
 
-# ⛔ محدودسازی بین ۰ تا ۱
-prob = np.clip(prob, 0, 1).astype("float32")
+# ذخیره تصاویر
+os.makedirs("outputs/png", exist_ok=True)
+Image.fromarray(ndvi_norm).save("outputs/png/ndvi_fixed.png")
+Image.fromarray(ndwi_norm).save("outputs/png/ndwi_fixed.png")
+Image.fromarray(void_norm).save("outputs/png/void_fixed.png")
 
-# 💾 ذخیره به عنوان probability_map.tif
-profile.update(dtype="float32", count=1)
-out_path = "outputs/geotiff/probability_map.tif"
+# ساخت نقشه ترکیبی احتمال
+combo = ((ndvi_norm.astype(np.float32) + ndwi_norm.astype(np.float32)) / 2 * (void_norm / 255)).astype(np.uint8)
+Image.fromarray(combo).save("outputs/png/probability_map.png")
 
-with rasterio.open(out_path, "w", **profile) as dst:
-    dst.write(prob, 1)
-
-print(f"\n✅ Probability Map saved to {out_path}")
+print("✅ تصاویر تحلیلی ساخته شدند.")

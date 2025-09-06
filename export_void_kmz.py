@@ -1,32 +1,53 @@
-# export_void_kmz.py
+import argparse
 import os
-import simplekml
-import rasterio
-from rasterio.plot import reshape_as_image
-from PIL import Image
+from datetime import datetime
+import zipfile
 
-def export_void_to_kmz(geotiff_path, kmz_path, temp_png="temp_void.png"):
-    with rasterio.open(geotiff_path) as src:
-        arr = src.read(1)
-        bounds = src.bounds
+# ورودی از کاربر
+parser = argparse.ArgumentParser(description="Create KMZ for Google Earth")
+parser.add_argument("--lat", type=float, required=True)
+parser.add_argument("--lon", type=float, required=True)
+parser.add_argument("--radius", type=int, default=100)
+args = parser.parse_args()
 
-    # نرمال‌سازی تصویر برای نمایش بهتر
-    arr_norm = ((arr - arr.min()) / (arr.max() - arr.min() + 1e-6) * 255).astype("uint8")
-    img = Image.fromarray(arr_norm)
-    img_path = temp_png
-    img.save(img_path)
+lat, lon, radius = args.lat, args.lon, args.radius
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # ساخت KMZ
-    kml = simplekml.Kml()
-    ground = kml.newgroundoverlay(name="Void Probability")
-    ground.icon.href = img_path
-    ground.latlonbox.north = bounds.top
-    ground.latlonbox.south = bounds.bottom
-    ground.latlonbox.east  = bounds.right
-    ground.latlonbox.west  = bounds.left
-    kml.savekmz(kmz_path)
+# ساخت مسیر خروجی
+output_folder = "outputs/kmz/advanced"
+os.makedirs(output_folder, exist_ok=True)
 
-    print("✅ Void KMZ saved to:", kmz_path)
+# ساخت فایل KML استاندارد
+kml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Void Detection - {timestamp}</name>
+    <Placemark>
+      <name>Void Center</name>
+      <description>Suspected void area with radius {radius} meters</description>
+      <Point>
+        <coordinates>{lon},{lat},0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>
+"""
 
-# اجرای مستقیم
-export_void_to_kmz("outputs/geotiff/probability_map.tif", "outputs/geotiff/probability_map.kmz")
+# مسیر ذخیره فایل‌ها
+kml_filename = f"void_{lat}_{lon}_{radius}_{timestamp}.kml"
+kml_path = os.path.join(output_folder, kml_filename)
+
+with open(kml_path, "w", encoding="utf-8") as f:
+    f.write(kml_content)
+
+# تبدیل KML به KMZ
+kmz_filename = kml_filename.replace(".kml", ".kmz")
+kmz_path = os.path.join(output_folder, kmz_filename)
+
+with zipfile.ZipFile(kmz_path, "w", zipfile.ZIP_DEFLATED) as kmz:
+    kmz.write(kml_path, arcname="doc.kml")
+
+# حذف فایل KML پس از فشرده‌سازی
+os.remove(kml_path)
+
+print(f"✅ فایل واقعی KMZ ساخته شد: {kmz_path}")

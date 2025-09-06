@@ -1,25 +1,26 @@
-streamlit==1.49.1
+# فایل: requirements.txt – نسخه نهایی برای VoidVision ONE™
+
+# کتابخانه‌های پایه برای اجرای Streamlit و تحلیل
+streamlit>=1.25
 numpy
+pillow
 pandas
 matplotlib
-geopandas
+
+# تحلیل تصاویر ماهواره‌ای
 rasterio
-shapely
 sentinelhub
-requests
-tqdm
-scikit-learn
-simplekml
-pillow
-pyproj
-fiona
-pyshp
-pyyaml
-altair
-jinja2
-urllib3
-click
-watchdog
-pydeck
-protobuf
-typing-extensions
+shapely
+folium
+
+# ساخت گزارش PDF حرفه‌ای
+reportlab
+
+# پردازش تاریخ و زمان
+python-dateutil
+
+# نمایش نقشه و تعاملی بودن
+streamlit-folium
+
+# برای کار با فایل‌های .env اگر نیاز باشد
+python-dotenv
