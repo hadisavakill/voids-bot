@@ -1,1 +1,43 @@
-1
+# نسخه نهایی برای اجرای VoidVision در Streamlit Cloud (CPU only)
+
+# پایه
+streamlit==1.49.1
+numpy
+pandas
+matplotlib
+pillow
+python-dateutil
+pyyaml
+
+# تحلیل فضایی
+rasterio
+shapely
+sentinelhub
+geopandas
+folium
+streamlit-folium
+
+# یادگیری ماشین
+scikit-learn
+simplekml
+
+# PyTorch CPU-only (سازگار با Streamlit Cloud)
+torch==2.0.1+cpu
+torchvision==0.15.2+cpu
+torchaudio==2.0.2+cpu
+-f https://download.pytorch.org/whl/torch_stable.html
+
+# گزارش و PDF
+reportlab
+
+# ابزارهای اضافی
+tqdm
+altair
+jinja2
+urllib3
+click
+watchdog
+pydeck
+protobuf
+typing-extensions
+python-dotenv
